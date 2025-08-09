@@ -64,8 +64,6 @@ export default function HomePage() {
     <main className="p-4 sm:p-8 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h4 className="text-3xl font-bold text-gray-800">PT. MUTIARA TANJUNG LESTARI</h4>
-          <h5 className="text-3xl font-bold text-gray-800">Dept. Plant Maintenance</h5>
           <h1 className="text-3xl font-bold text-gray-800">Unit Breakdown Site GMO</h1>
           <button
             onClick={() => setIsAddModalOpen(true)}
