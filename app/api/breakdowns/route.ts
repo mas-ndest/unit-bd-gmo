@@ -2,7 +2,6 @@
 
 import { google } from 'googleapis';
 import { NextResponse } from 'next/server';
-import { sendWablasNotification } from '../../lib/wablas';
 
 export async function GET() {
   console.log("CHECKING ENV VAR:", process.env.GOOGLE_SHEET_ID);
@@ -55,8 +54,6 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-
-    // --- LOGIKA LAMA: Menyimpan ke Google Sheets (Dipertahankan) ---
     const auth = new google.auth.GoogleAuth({
         credentials: {
           client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
@@ -80,34 +77,17 @@ export async function POST(request: Request) {
       'Open', // statusBd
       '', // dateClose
       '', // timeClose
+      '', // Kolom O (notifOpen)
+      '', // Kolom P (notifClosed)
     ];
     await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: 'breakdown!A:N',
+      range: 'breakdown!A:P', // Sesuaikan range hingga kolom P
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [newRow],
       },
     });
-    // --- AKHIR LOGIKA LAMA ---
-
-    // --- LOGIKA BARU: Mengirim Notifikasi (Ditambahkan) ---
-    const pesanNotifikasi = 
-`‼️ *LAPORAN BREAKDOWN BARU* ‼️
-
-Tim terkait mohon segera merespons laporan berikut:
-
-- *Unit*: *${body.kodeUnit} (${body.tipeUnit})*
-- *Tanggal & Jam*: *${body.dateBd} ${body.timeBd}*
-- *Lokasi*: *${body.lokasi}*
-- *HM/KM*: *${body.hm}*
-- *Kerusakan*: *${body.deskripsiBd}*
-- *Pelapor*: *${body.reporter}*
-
-Terima kasih.`;
-
-    await sendWablasNotification(pesanNotifikasi);
-    // --- AKHIR LOGIKA BARU ---
 
     return NextResponse.json({ message: 'Data berhasil disimpan' });
   } catch (error: any) {
@@ -117,14 +97,12 @@ Terima kasih.`;
 }
 
 /**
- * Mengupdate laporan breakdown dan mengirim notifikasi jika ditutup.
+ * Mengupdate laporan breakdown (tanpa notifikasi).
  */
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
     const { idBd, statusBd, dateClose, timeClose } = body;
-
-    // --- LOGIKA LAMA: Mengupdate Google Sheets (Dipertahankan) ---
     const auth = new google.auth.GoogleAuth({
         credentials: {
           client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
@@ -133,19 +111,16 @@ export async function PUT(request: Request) {
         scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
     const sheets = google.sheets({ auth, version: 'v4' });
-
     const getResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: process.env.GOOGLE_SHEET_ID,
         range: 'breakdown!A:A',
     });
     const idColumn = getResponse.data.values;
     if (!idColumn) throw new Error("Sheet 'breakdown' tidak ditemukan.");
-
     const rowIndex = idColumn.findIndex(row => row[0] === idBd) + 1;
     if (rowIndex === 0) {
         return NextResponse.json({ error: `ID Breakdown '${idBd}' tidak ditemukan` }, { status: 404 });
     }
-
     await sheets.spreadsheets.values.update({
         spreadsheetId: process.env.GOOGLE_SHEET_ID,
         range: `breakdown!L${rowIndex}:N${rowIndex}`,
@@ -154,24 +129,6 @@ export async function PUT(request: Request) {
             values: [[statusBd, dateClose, timeClose]],
         },
     });
-    // --- AKHIR LOGIKA LAMA ---
-
-    // --- LOGIKA BARU: Mengirim Notifikasi (Ditambahkan) ---
-    if (statusBd === 'Closed') {
-        const pesanNotifikasi = 
-`✅ *UPDATE: UNIT READY* ✅
-
-Informasi unit yang telah selesai diperbaiki:
-
-- *ID Laporan*: *${idBd}*
-- *Status*: *SELESAI / CLOSED*
-- *Waktu Selesai*: *${dateClose} ${timeClose}*
-
-Unit sudah siap untuk dioperasikan kembali. Terima kasih kepada tim yang bertugas.`;
-
-        await sendWablasNotification(pesanNotifikasi);
-    }
-    // --- AKHIR LOGIKA BARU ---
 
     return NextResponse.json({ message: 'Breakdown berhasil diupdate' });
   } catch (error: any) {
@@ -179,4 +136,5 @@ Unit sudah siap untuk dioperasikan kembali. Terima kasih kepada tim yang bertuga
     return NextResponse.json({ error: error.message || 'Gagal mengupdate breakdown' }, { status: 500 });
   }
 }
+
 

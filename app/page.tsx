@@ -63,6 +63,12 @@ export default function HomePage() {
   return (
     <main className="p-4 sm:p-8 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
+
+        <div className="text-left mb-8">
+            <h2 className="text-xl font-bold text-gray-800">PT. MUTIARA TANJUNG LESTARI</h2>
+            <p className="text-md text-gray-600">Dept. Plant Maintenance</p>
+        </div>
+
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-800">Unit Breakdown Site GMO</h1>
           <button
