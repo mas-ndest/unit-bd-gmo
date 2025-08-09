@@ -2,6 +2,7 @@
 
 import { google } from 'googleapis';
 import { NextResponse } from 'next/server';
+import { sendWablasNotification } from '../../lib/wablas';
 
 export async function GET() {
   console.log("CHECKING ENV VAR:", process.env.GOOGLE_SHEET_ID);
@@ -55,39 +56,31 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // Validasi sederhana
-    if (!body.kodeUnit || !body.dateBd || !body.timeBd) {
-      return NextResponse.json({ error: 'Data penting tidak lengkap' }, { status: 400 });
-    }
-
+    // --- LOGIKA LAMA: Menyimpan ke Google Sheets (Dipertahankan) ---
     const auth = new google.auth.GoogleAuth({
-      credentials: {
-        client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
-        private_key: process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      },
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+        credentials: {
+          client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
+          private_key: process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        },
+        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
-
     const sheets = google.sheets({ auth, version: 'v4' });
-
-    // Sesuaikan urutan array dengan urutan kolom di sheet 'breakdown' Anda
     const newRow = [
-      `BD-${Date.now()}`, // idBd
-      body.dateBd,         // dateBd (dari form)
-      body.timeBd,         // timeBd (dari form)
-      body.kodeUnit,       // kodeUnit (dari form)
-      body.hm,             // hm (dari form)
-      body.tipeUnit,       // tipeUnit (dari form, otomatis)
-      body.lokasi,         // lokasi (default)
-      body.deskripsiBd,    // deskripsiBd (dari form)
-      body.reporter,       // reporter (dari form)
-      body.section,        // section (default)
-      '',                  // workOrder
-      'Open',              // statusBd
-      '',                  // dateClose
-      '',                  // timeClose
+      `BD-${Date.now()}`,
+      body.dateBd,
+      body.timeBd,
+      body.kodeUnit,
+      body.hm,
+      body.tipeUnit,
+      body.lokasi,
+      body.deskripsiBd,
+      body.reporter,
+      body.section,
+      '', // workOrder
+      'Open', // statusBd
+      '', // dateClose
+      '', // timeClose
     ];
-
     await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
       range: 'breakdown!A:N',
@@ -96,25 +89,42 @@ export async function POST(request: Request) {
         values: [newRow],
       },
     });
+    // --- AKHIR LOGIKA LAMA ---
+
+    // --- LOGIKA BARU: Mengirim Notifikasi (Ditambahkan) ---
+    const pesanNotifikasi = 
+`‼️ *LAPORAN BREAKDOWN BARU* ‼️
+
+Tim terkait mohon segera merespons laporan berikut:
+
+- *Unit*: *${body.kodeUnit} (${body.tipeUnit})*
+- *Tanggal & Jam*: *${body.dateBd} ${body.timeBd}*
+- *Lokasi*: *${body.lokasi}*
+- *HM/KM*: *${body.hm}*
+- *Kerusakan*: *${body.deskripsiBd}*
+- *Pelapor*: *${body.reporter}*
+
+Terima kasih.`;
+
+    await sendWablasNotification(pesanNotifikasi);
+    // --- AKHIR LOGIKA BARU ---
 
     return NextResponse.json({ message: 'Data berhasil disimpan' });
-
-  } catch (error) {
-    console.error("ERROR SAAT MENYIMPAN DATA:", error);
-    return NextResponse.json({ error: 'Gagal menyimpan data ke Google Sheets' }, { status: 500 });
+  } catch (error: any) {
+    console.error("ERROR SAAT MENYIMPAN BREAKDOWN:", error);
+    return NextResponse.json({ error: error.message || 'Gagal menyimpan data' }, { status: 500 });
   }
 }
 
+/**
+ * Mengupdate laporan breakdown dan mengirim notifikasi jika ditutup.
+ */
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
     const { idBd, statusBd, dateClose, timeClose } = body;
 
-    if (!idBd) {
-      return NextResponse.json({ error: 'idBd diperlukan untuk update' }, { status: 400 });
-    }
-
-    // BAGIAN YANG DIPERBAIKI: Menambahkan otentikasi yang benar
+    // --- LOGIKA LAMA: Mengupdate Google Sheets (Dipertahankan) ---
     const auth = new google.auth.GoogleAuth({
         credentials: {
           client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
@@ -124,36 +134,49 @@ export async function PUT(request: Request) {
     });
     const sheets = google.sheets({ auth, version: 'v4' });
 
-    // 1. Ambil semua data ID untuk menemukan baris yang benar
     const getResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: process.env.GOOGLE_SHEET_ID,
-        range: 'breakdown!A:A', // Cukup ambil kolom ID
+        range: 'breakdown!A:A',
     });
-
     const idColumn = getResponse.data.values;
-    if (!idColumn) throw new Error("Sheet 'breakdown' tidak ditemukan atau kosong.");
+    if (!idColumn) throw new Error("Sheet 'breakdown' tidak ditemukan.");
 
-    // 2. Cari index baris (tambah 1 karena index array dari 0, baris sheet dari 1)
     const rowIndex = idColumn.findIndex(row => row[0] === idBd) + 1;
-    if (rowIndex === 0) { // findIndex mengembalikan -1 jika tidak ketemu
+    if (rowIndex === 0) {
         return NextResponse.json({ error: `ID Breakdown '${idBd}' tidak ditemukan` }, { status: 404 });
     }
 
-    // 3. Update status, tgl tutup, dan jam tutup
-    // Kolom L = statusBd, M = dateClose, N = timeClose
     await sheets.spreadsheets.values.update({
         spreadsheetId: process.env.GOOGLE_SHEET_ID,
-        range: `breakdown!L${rowIndex}:N${rowIndex}`, // Target spesifik ke kolom yg diupdate
+        range: `breakdown!L${rowIndex}:N${rowIndex}`,
         valueInputOption: 'USER_ENTERED',
         requestBody: {
             values: [[statusBd, dateClose, timeClose]],
         },
     });
+    // --- AKHIR LOGIKA LAMA ---
+
+    // --- LOGIKA BARU: Mengirim Notifikasi (Ditambahkan) ---
+    if (statusBd === 'Closed') {
+        const pesanNotifikasi = 
+`✅ *UPDATE: UNIT READY* ✅
+
+Informasi unit yang telah selesai diperbaiki:
+
+- *ID Laporan*: *${idBd}*
+- *Status*: *SELESAI / CLOSED*
+- *Waktu Selesai*: *${dateClose} ${timeClose}*
+
+Unit sudah siap untuk dioperasikan kembali. Terima kasih kepada tim yang bertugas.`;
+
+        await sendWablasNotification(pesanNotifikasi);
+    }
+    // --- AKHIR LOGIKA BARU ---
 
     return NextResponse.json({ message: 'Breakdown berhasil diupdate' });
   } catch (error: any) {
     console.error("ERROR SAAT UPDATE BREAKDOWN:", error);
-    // Kirim pesan error yang lebih spesifik ke frontend
     return NextResponse.json({ error: error.message || 'Gagal mengupdate breakdown' }, { status: 500 });
   }
 }
+
