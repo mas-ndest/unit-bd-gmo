@@ -64,7 +64,9 @@ export default function HomePage() {
     <main className="p-4 sm:p-8 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">Daftar Unit Breakdown</h1>
+          <h4 className="text-3xl font-bold text-gray-800">PT. MUTIARA TANJUNG LESTARI</h4>
+          <h5 className="text-3xl font-bold text-gray-800">Dept. Plant Maintenance</h5>
+          <h1 className="text-3xl font-bold text-gray-800">Unit Breakdown Site GMO</h1>
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-opacity-75"
