@@ -3,18 +3,43 @@
 import { google } from 'googleapis';
 import { NextResponse } from 'next/server';
 
-// Fungsi helper untuk menghitung durasi
-function calculateDuration(startDateTimeStr: string, endDateTimeStr: string | null): string {
-    // Cek jika input string valid
-    if (!startDateTimeStr || !startDateTimeStr.includes('T')) return 'Invalid Start';
+// FUNGSI YANG DIPERBAIKI DENGAN PENANGANAN ZONA WAKTU
+function calculateDuration(dateStr: string, timeStr: string, dateCloseStr: string, timeCloseStr: string): string {
+    // Validasi input dasar
+    if (!dateStr || !timeStr) return 'N/A';
 
+    // Menangani format tanggal DD-MM-YYYY atau YYYY-MM-DD
+    const parts = dateStr.split(/[-/]/);
+    const year = parts[0].length === 4 ? parts[0] : parts[2];
+    const month = parts[1];
+    const day = parts[0].length === 4 ? parts[2] : parts[0];
+
+    // Buat string tanggal-waktu dengan format ISO 8601 dan tambahkan offset zona waktu WITA (UTC+8)
+    const startDateTimeStr = `${year}-${month}-${day}T${timeStr}:00+08:00`;
     const startDate = new Date(startDateTimeStr);
-    const endDate = endDateTimeStr && endDateTimeStr.includes('T') ? new Date(endDateTimeStr) : new Date();
-    
-    // Cek jika hasil konversi date valid
-    if (isNaN(startDate.getTime())) return 'Invalid Start Date';
 
+    let endDate;
+    if (dateCloseStr && timeCloseStr) {
+        const closeParts = dateCloseStr.split(/[-/]/);
+        const closeYear = closeParts[0].length === 4 ? closeParts[0] : closeParts[2];
+        const closeMonth = closeParts[1];
+        const closeDay = closeParts[0].length === 4 ? closeParts[2] : closeParts[0];
+        // Lakukan hal yang sama untuk tanggal selesai
+        const endDateTimeStr = `${closeYear}-${closeMonth}-${closeDay}T${timeCloseStr}:00+08:00`;
+        endDate = new Date(endDateTimeStr);
+    } else {
+        // Waktu saat ini di server (UTC), ini sudah benar untuk perbandingan
+        endDate = new Date(); 
+    }
+
+    if (isNaN(startDate.getTime())) return 'Invalid Start Date';
+    if (endDate && isNaN(endDate.getTime())) return 'Invalid End Date';
+
+    // Perbedaan waktu dalam milidetik
     let diff = endDate.getTime() - startDate.getTime();
+
+    // Durasi tidak mungkin negatif sekarang, tapi sebagai pengaman
+    if (diff < 0) return '0d 0j 0m';
 
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     diff -= days * (1000 * 60 * 60 * 24);
@@ -22,12 +47,13 @@ function calculateDuration(startDateTimeStr: string, endDateTimeStr: string | nu
     diff -= hours * (1000 * 60 * 60);
     const minutes = Math.floor(diff / (1000 * 60));
 
-    return `${days}h ${hours}j ${minutes}m`;
+    // Menggunakan d (hari), j (jam), m (menit)
+    return `${days}d ${hours}j ${minutes}m`;
 }
+
 
 export async function GET() {
   try {
-    // INI BAGIAN YANG DIPERBAIKI: Menambahkan kredensial secara eksplisit
     const auth = new google.auth.GoogleAuth({
         credentials: {
           client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
@@ -37,7 +63,6 @@ export async function GET() {
     });
     const sheets = google.sheets({ auth, version: 'v4' });
 
-    // Ambil semua data breakdown & log perbaikan sekaligus
     const [breakdownRes, logRes] = await Promise.all([
         sheets.spreadsheets.values.get({ spreadsheetId: process.env.GOOGLE_SHEET_ID, range: 'breakdown!A:N' }),
         sheets.spreadsheets.values.get({ spreadsheetId: process.env.GOOGLE_SHEET_ID, range: 'logPerbaikan!A:N' })
@@ -73,14 +98,12 @@ export async function GET() {
                 }
             }
         }
-
-        const startDateTime = (bd.dateBd && bd.timeBd) ? `${bd.dateBd}T${bd.timeBd}` : null;
-        const endDateTime = (bd.dateClose && bd.timeClose) ? `${bd.dateClose}T${bd.timeClose}` : null;
         
         return {
             ...bd,
             realtimeStatus,
-            duration: startDateTime ? calculateDuration(startDateTime, endDateTime) : 'N/A',
+            // PANGGIL FUNGSI BARU
+            duration: calculateDuration(bd.dateBd, bd.timeBd, bd.dateClose, bd.timeClose),
         };
     });
 

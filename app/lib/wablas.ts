@@ -2,35 +2,39 @@
 
 /**
  * Fungsi untuk mengirim notifikasi WhatsApp melalui Wablas API v2.
- * @param message Pesan yang akan dikirim.
+ * Versi ini ditambahkan log detail untuk debugging.
  */
 export async function sendWablasNotification(message: string) {
-  // Ambil kredensial dari environment variables
   const token = process.env.WABLAS_API_TOKEN;
-  // Di sini, WABLAS_GROUP_ID Anda adalah nilai untuk field 'phone'
   const targetGroup = process.env.WABLAS_GROUP_ID;
 
+  // --- LOGGING UNTUK DEBUG ---
+  console.log("--- Memulai Proses Notifikasi Wablas ---");
+  console.log(`Token Ditemukan: ${token ? 'Ya' : 'Tidak'}`);
+  console.log(`Group ID Ditemukan: ${targetGroup || 'Tidak Ada'}`);
+  // ---------------------------
+
   if (!token || !targetGroup) {
-    console.error("Kredensial Wablas (Token & Group ID) tidak ditemukan.");
+    console.error("STOP: Kredensial Wablas tidak lengkap di Environment Variables.");
     return;
   }
 
-  // URL API v2 sesuai kode Anda
   const url = "https://kudus.wablas.com/api/v2/send-message";
-
-  // Siapkan payload sesuai struktur data yang Anda gunakan
   const payload = {
     "data": [
       {
         "phone": targetGroup,
         "message": message,
-        "isGroup": true // Mengirim ke grup
+        "isGroup": true
       }
     ]
   };
 
   try {
-    console.log("Mengirim notifikasi ke Wablas API v2...");
+    // --- LOGGING UNTUK DEBUG ---
+    console.log("Mengirim payload ke Wablas:", JSON.stringify(payload, null, 2));
+    // ---------------------------
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -41,13 +45,18 @@ export async function sendWablasNotification(message: string) {
     });
 
     const result = await response.json();
-    if (result.status === 'success') {
-      console.log("Notifikasi Wablas berhasil dikirim.");
-    } else {
-      // Log pesan error dari Wablas jika ada
-      console.error("Gagal mengirim notifikasi Wablas:", result.data[0]?.message || 'Pesan error tidak diketahui');
+
+    // --- LOGGING UNTUK DEBUG ---
+    console.log("--- Respons Penuh dari Wablas ---");
+    console.log(JSON.stringify(result, null, 2));
+    console.log("---------------------------------");
+    // ---------------------------
+
+    if (result.status !== 'success') {
+      console.error("Wablas melaporkan kegagalan:", result.data?.[0]?.message || 'Pesan error tidak diketahui');
     }
+
   } catch (error) {
-    console.error("Terjadi error saat menghubungi API Wablas:", error);
+    console.error("Terjadi error saat fetch ke API Wablas:", error);
   }
 }
