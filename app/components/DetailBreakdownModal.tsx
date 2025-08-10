@@ -1,7 +1,7 @@
 // app/components/DetailBreakdownModal.tsx
 "use client";
 
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 
 // Tipe Data
 interface Breakdown { [key: string]: any; }
@@ -31,6 +31,7 @@ export default function DetailBreakdownModal({ breakdown, onClose, onUpdate }: P
   const [tindakan, setTindakan] = useState('Progress');
   const [selectedComponent, setSelectedComponent] = useState('');
 
+  // Fungsi untuk mengambil semua data yang diperlukan modal ini
   const fetchAllData = async () => {
     setIsLoadingLogs(true);
     try {
@@ -44,6 +45,7 @@ export default function DetailBreakdownModal({ breakdown, onClose, onUpdate }: P
       setComponents(compData.data || {});
     } catch (err) {
         console.error("Gagal memuat data modal detail:", err);
+        alert('Gagal memuat data pendukung.');
     } finally {
       setIsLoadingLogs(false);
     }
@@ -53,6 +55,16 @@ export default function DetailBreakdownModal({ breakdown, onClose, onUpdate }: P
     fetchAllData();
   }, [breakdown.idBd]);
 
+  // PERUBAHAN DI SINI: Validasi sebelum menampilkan form tutup
+  const handleInitiateClose = () => {
+    if (logs.length === 0) {
+      alert('Tidak bisa menutup laporan, belum ada aktivitas perbaikan yang dicatat.');
+      return; // Hentikan fungsi jika tidak ada log
+    }
+    setIsClosing(true);
+  };
+
+  // Handler untuk submit form tutup laporan
   const handleConfirmClose = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
@@ -69,7 +81,7 @@ export default function DetailBreakdownModal({ breakdown, onClose, onUpdate }: P
             body: JSON.stringify(body),
         });
         if (!response.ok) throw new Error((await response.json()).error || "Gagal menutup breakdown");
-        alert('Breakdown berhasil ditutup!');
+        alert('Laporan berhasil ditutup!');
         onUpdate();
         onClose();
     } catch (err: any) {
@@ -77,6 +89,7 @@ export default function DetailBreakdownModal({ breakdown, onClose, onUpdate }: P
     }
   };
 
+  // Handler untuk submit form aktivitas baru
   const handleAddLog = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
@@ -102,6 +115,7 @@ export default function DetailBreakdownModal({ breakdown, onClose, onUpdate }: P
             body: JSON.stringify(data),
         });
         if (!response.ok) throw new Error((await response.json()).error || "Gagal menyimpan aktivitas");
+        alert('Aktivitas berhasil disimpan!');
         setShowAddForm(false);
         fetchAllData();
     } catch (err: any) {
@@ -109,9 +123,11 @@ export default function DetailBreakdownModal({ breakdown, onClose, onUpdate }: P
     }
   };
   
+  // Handler untuk submit form EDIT aktivitas
   const handleEditLog = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!editingLog) return;
+
     const formData = new FormData(event.currentTarget);
     const data = {
         idLog: editingLog.idLog,
@@ -127,6 +143,7 @@ export default function DetailBreakdownModal({ breakdown, onClose, onUpdate }: P
             body: JSON.stringify(data),
         });
         if (!response.ok) throw new Error((await response.json()).error || "Gagal mengupdate aktivitas");
+        alert('Aktivitas berhasil diupdate!');
         setEditingLog(null);
         fetchAllData();
     } catch (err: any) {
@@ -135,7 +152,7 @@ export default function DetailBreakdownModal({ breakdown, onClose, onUpdate }: P
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex justify-center items-center p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl">
         <div className="p-4 border-b flex justify-between items-center">
           <h2 className="text-xl font-bold text-gray-900">Detail & Aktivitas: {breakdown.kodeUnit}</h2>
@@ -148,34 +165,34 @@ export default function DetailBreakdownModal({ breakdown, onClose, onUpdate }: P
             <div className="flex justify-between items-center mb-3">
                 <h3 className="font-bold text-lg text-gray-800">Laporan Breakdown</h3>
                 {breakdown.statusBd === 'Open' && !isClosing && (
-                  <button onClick={() => setIsClosing(true)} className="px-3 py-1 bg-green-600 text-white rounded-md text-sm font-semibold hover:bg-green-700">
+                  <button onClick={handleInitiateClose} className="px-3 py-1 bg-green-600 text-white rounded-md text-sm font-semibold hover:bg-green-700">
                     Selesaikan Laporan
                   </button>
                 )}
             </div>
             {isClosing && (
-                <form onSubmit={handleConfirmClose} className="p-4 mb-3 bg-green-50 rounded-lg border border-green-200">
-                    <p className="font-semibold text-green-800">Tutup Laporan Breakdown</p>
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                        <input type="date" name="dateClose" required className="p-2 border border-gray-300 rounded-md shadow-sm text-sm"/>
-                        <input type="time" name="timeClose" required className="p-2 border border-gray-300 rounded-md shadow-sm text-sm"/>
-                    </div>
-                    <div className="flex gap-2 mt-3 justify-end">
-                        <button type="button" onClick={() => setIsClosing(false)} className="px-3 py-1 bg-white border rounded-md text-sm">Batal</button>
-                        <button type="submit" className="px-3 py-1 bg-green-600 text-white rounded-md text-sm font-semibold">Konfirmasi & Tutup</button>
-                    </div>
-                </form>
+              <form onSubmit={handleConfirmClose} className="p-4 mb-3 bg-green-50 rounded-lg border border-green-200">
+                  <p className="font-semibold text-green-800">Tutup Laporan Breakdown</p>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                      <input type="date" name="dateClose" required className="p-2 border border-gray-300 rounded-md shadow-sm text-sm"/>
+                      <input type="time" name="timeClose" required className="p-2 border border-gray-300 rounded-md shadow-sm text-sm"/>
+                  </div>
+                  <div className="flex gap-2 mt-3 justify-end">
+                      <button type="button" onClick={() => setIsClosing(false)} className="px-3 py-1 bg-white border rounded-md text-sm">Batal</button>
+                      <button type="submit" className="px-3 py-1 bg-green-600 text-white rounded-md text-sm font-semibold">Konfirmasi & Tutup</button>
+                  </div>
+              </form>
             )}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-sm">
-                <div><strong>Status:</strong> <span className={`font-semibold ${breakdown.statusBd === 'Open' ? 'text-red-600' : 'text-green-600'}`}>{breakdown.statusBd}</span></div>
-                <div><strong>Pelapor:</strong> {breakdown.reporter}</div>
-                <div><strong>Tgl Lapor:</strong> {breakdown.dateBd} {breakdown.timeBd}</div>
-                <div><strong>Tipe Unit:</strong> {breakdown.tipeUnit}</div>
-                <div><strong>HM/KM:</strong> {breakdown.hm}</div>
-                <div><strong>Lokasi:</strong> {breakdown.lokasi}</div>
-                <div className="col-span-full"><strong>Deskripsi:</strong> {breakdown.deskripsiBd}</div>
-                {breakdown.statusBd === 'Closed' && 
-                 <div><strong>Tgl Selesai:</strong> {breakdown.dateClose} {breakdown.timeClose}</div>}
+              <div><strong>Status:</strong> <span className={`font-semibold ${breakdown.statusBd === 'Open' ? 'text-red-600' : 'text-green-600'}`}>{breakdown.statusBd}</span></div>
+              <div><strong>Pelapor:</strong> {breakdown.reporter}</div>
+              <div><strong>Tgl Lapor:</strong> {breakdown.dateBd} {breakdown.timeBd}</div>
+              <div><strong>Tipe Unit:</strong> {breakdown.tipeUnit}</div>
+              <div><strong>HM/KM:</strong> {breakdown.hm}</div>
+              <div><strong>Lokasi:</strong> {breakdown.lokasi}</div>
+              <div className="col-span-full"><strong>Deskripsi:</strong> {breakdown.deskripsiBd}</div>
+              {breakdown.statusBd === 'Closed' && 
+               <div><strong>Tgl Selesai:</strong> {breakdown.dateClose} {breakdown.timeClose}</div>}
             </div>
           </div>
           
@@ -197,7 +214,7 @@ export default function DetailBreakdownModal({ breakdown, onClose, onUpdate }: P
                     <input name="startTime" type="time" required className="p-2 border rounded-md"/>
                  </div>
                  <div className="grid grid-cols-2 gap-3">
-                    <select name="Tindakan" value={tindakan} onChange={(e) => setTindakan(e.target.value)} className="p-2 border rounded-md">
+                    <select name="Tindakan" value={tindakan} onChange={(e: ChangeEvent<HTMLSelectElement>) => setTindakan(e.target.value)} className="p-2 border rounded-md">
                         <option value="Progress">Progress</option>
                         <option value="Waiting">Waiting</option>
                     </select>
@@ -208,7 +225,7 @@ export default function DetailBreakdownModal({ breakdown, onClose, onUpdate }: P
                     )}
                  </div>
                  <div className="grid grid-cols-2 gap-3">
-                    <select name="Component" value={selectedComponent} onChange={(e) => setSelectedComponent(e.target.value)} className="p-2 border rounded-md">
+                    <select name="Component" value={selectedComponent} onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedComponent(e.target.value)} className="p-2 border rounded-md">
                         <option value="">Pilih Komponen...</option>
                         {Object.keys(components).map(comp => <option key={comp} value={comp}>{comp}</option>)}
                     </select>
@@ -220,7 +237,6 @@ export default function DetailBreakdownModal({ breakdown, onClose, onUpdate }: P
                     )}
                  </div>
                  <textarea name="deskripsiPerbaikan" placeholder="Deskripsi perbaikan..." required className="w-full p-2 border rounded-md"></textarea>
-                 {/* KONDISI BARU UNTUK MAN POWER & PENGAWAS */}
                  {tindakan !== 'Waiting' && (
                     <div className="grid grid-cols-2 gap-3">
                         <input name="manPower" placeholder="Man Power (Mekanik)" required className="w-full p-2 border rounded-md"/>
@@ -255,7 +271,6 @@ export default function DetailBreakdownModal({ breakdown, onClose, onUpdate }: P
                         <div className="p-3 border rounded-md bg-gray-50 text-sm group relative">
                             <p className="font-bold">{log.Tindakan} {log.subTindakan ? `(${log.subTindakan})` : ''}</p>
                             <p>{log.deskripsiPerbaikan}</p>
-                            {/* INFORMASI BARU DITAMPILKAN DI SINI */}
                             <div className="text-xs text-gray-500 mt-2 border-t pt-2 space-y-1">
                                 <p><strong>Mulai:</strong> {log.startDate} {log.startTime}</p>
                                 {log.endDate && <p><strong>Selesai:</strong> {log.endDate} {log.endTime}</p>}
