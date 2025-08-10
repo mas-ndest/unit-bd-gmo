@@ -3,43 +3,52 @@
 import { google } from 'googleapis';
 import { NextResponse } from 'next/server';
 
-// FUNGSI YANG DIPERBAIKI DENGAN PENANGANAN ZONA WAKTU
+// FUNGSI YANG DIPERBAIKI untuk menangani berbagai format tanggal
 function calculateDuration(dateStr: string, timeStr: string, dateCloseStr: string, timeCloseStr: string): string {
-    // Validasi input dasar
+    // Validasi input dasar, jika tanggal atau waktu kosong, kembalikan N/A
     if (!dateStr || !timeStr) return 'N/A';
 
-    // Menangani format tanggal DD-MM-YYYY atau YYYY-MM-DD
+    // Pisahkan tanggal berdasarkan pemisah umum (/, -)
     const parts = dateStr.split(/[-/]/);
-    const year = parts[0].length === 4 ? parts[0] : parts[2];
-    const month = parts[1];
-    const day = parts[0].length === 4 ? parts[2] : parts[0];
+    if (parts.length !== 3) return 'Invalid Date Format';
 
-    // Buat string tanggal-waktu dengan format ISO 8601 dan tambahkan offset zona waktu WITA (UTC+8)
-    const startDateTimeStr = `${year}-${month}-${day}T${timeStr}:00+08:00`;
+    let year, month, day;
+
+    // Logika untuk mendeteksi format YYYY-MM-DD atau DD-MM-YYYY
+    if (parts[0].length === 4) { // YYYY-MM-DD
+        [year, month, day] = parts;
+    } else if (parts[2].length === 4) { // DD-MM-YYYY
+        [day, month, year] = parts;
+    } else {
+        return 'Ambiguous Date Format';
+    }
+
+    // Buat string tanggal yang valid untuk JavaScript: YYYY-MM-DDTHH:mm:ss
+    const startDateTimeStr = `${year}-${month}-${day}T${timeStr}`;
     const startDate = new Date(startDateTimeStr);
 
     let endDate;
     if (dateCloseStr && timeCloseStr) {
         const closeParts = dateCloseStr.split(/[-/]/);
-        const closeYear = closeParts[0].length === 4 ? closeParts[0] : closeParts[2];
-        const closeMonth = closeParts[1];
-        const closeDay = closeParts[0].length === 4 ? closeParts[2] : closeParts[0];
-        // Lakukan hal yang sama untuk tanggal selesai
-        const endDateTimeStr = `${closeYear}-${closeMonth}-${closeDay}T${timeCloseStr}:00+08:00`;
-        endDate = new Date(endDateTimeStr);
+        let closeYear, closeMonth, closeDay;
+        if (closeParts[0].length === 4) {
+            [closeYear, closeMonth, closeDay] = closeParts;
+        } else if (closeParts[2].length === 4) {
+            [closeDay, closeMonth, closeYear] = closeParts;
+        }
+        if(closeYear) {
+            endDate = new Date(`${closeYear}-${closeMonth}-${closeDay}T${timeCloseStr}`);
+        } else {
+            endDate = new Date(); // Fallback ke waktu sekarang jika format tanggal tutup salah
+        }
     } else {
-        // Waktu saat ini di server (UTC), ini sudah benar untuk perbandingan
-        endDate = new Date(); 
+        endDate = new Date(); // Waktu saat ini di server
     }
 
     if (isNaN(startDate.getTime())) return 'Invalid Start Date';
-    if (endDate && isNaN(endDate.getTime())) return 'Invalid End Date';
 
-    // Perbedaan waktu dalam milidetik
     let diff = endDate.getTime() - startDate.getTime();
-
-    // Durasi tidak mungkin negatif sekarang, tapi sebagai pengaman
-    if (diff < 0) return '0d 0j 0m';
+    if (diff < 0) diff = 0; // Cegah durasi negatif
 
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     diff -= days * (1000 * 60 * 60 * 24);
@@ -47,8 +56,7 @@ function calculateDuration(dateStr: string, timeStr: string, dateCloseStr: strin
     diff -= hours * (1000 * 60 * 60);
     const minutes = Math.floor(diff / (1000 * 60));
 
-    // Menggunakan d (hari), j (jam), m (menit)
-    return `${days}d ${hours}j ${minutes}m`;
+    return `${days}h ${hours}j ${minutes}m`;
 }
 
 
@@ -102,7 +110,6 @@ export async function GET() {
         return {
             ...bd,
             realtimeStatus,
-            // PANGGIL FUNGSI BARU
             duration: calculateDuration(bd.dateBd, bd.timeBd, bd.dateClose, bd.timeClose),
         };
     });

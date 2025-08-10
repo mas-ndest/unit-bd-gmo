@@ -185,14 +185,14 @@ export default function DetailBreakdownModal({ breakdown, onClose, onUpdate }: P
             )}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-sm">
               <div><strong>Status:</strong> <span className={`font-semibold ${breakdown.statusBd === 'Open' ? 'text-red-600' : 'text-green-600'}`}>{breakdown.statusBd}</span></div>
-              <div><strong>Pelapor:</strong> {breakdown.reporter}</div>
-              <div><strong>Tgl Lapor:</strong> {breakdown.dateBd} {breakdown.timeBd}</div>
+              <div><strong>Reporter:</strong> {breakdown.reporter}</div>
+              <div><strong>Tgl BD:</strong> {breakdown.dateBd} {breakdown.timeBd}</div>
               <div><strong>Tipe Unit:</strong> {breakdown.tipeUnit}</div>
               <div><strong>HM/KM:</strong> {breakdown.hm}</div>
               <div><strong>Lokasi:</strong> {breakdown.lokasi}</div>
               <div className="col-span-full"><strong>Deskripsi:</strong> {breakdown.deskripsiBd}</div>
               {breakdown.statusBd === 'Closed' && 
-               <div><strong>Tgl Selesai:</strong> {breakdown.dateClose} {breakdown.timeClose}</div>}
+               <div><strong>Tgl Ready:</strong> {breakdown.dateClose} {breakdown.timeClose}</div>}
             </div>
           </div>
           
